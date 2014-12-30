@@ -340,7 +340,7 @@ void ikcp_release(ikcpcb *kcp)
 
 
 //---------------------------------------------------------------------
-// recv data
+// user/upper level recv: returns size, returns below zero for EAGAIN
 //---------------------------------------------------------------------
 int ikcp_recv(ikcpcb *kcp, char *buffer, int len)
 {
@@ -423,7 +423,7 @@ int ikcp_recv(ikcpcb *kcp, char *buffer, int len)
 
 
 //---------------------------------------------------------------------
-// send data
+// peek data size
 //---------------------------------------------------------------------
 int ikcp_peeksize(const ikcpcb *kcp)
 {
@@ -451,7 +451,7 @@ int ikcp_peeksize(const ikcpcb *kcp)
 
 
 //---------------------------------------------------------------------
-// send data
+// user/upper level send, returns below zero for error
 //---------------------------------------------------------------------
 int ikcp_send(ikcpcb *kcp, const char *buffer, int len)
 {
@@ -1072,6 +1072,16 @@ void ikcp_update(ikcpcb *kcp, IUINT32 current)
 }
 
 
+//---------------------------------------------------------------------
+// Determine when should you invoke ikcp_update:
+// if there is no ikcp_input/_send calling, you can call ikcp_update
+// after millisecs ikcp_check returns, instead of call update repeatly.
+// It is important to reduce unnacessary ikcp_update calling. you can 
+// just call ikcp_update in a very small interval, or you can use it to 
+// schedule ikcp_update calling (eg. when you are implementing an epoll
+// like mechanism, or optimize ikcp_update when handling massive kcp 
+// connections)
+//---------------------------------------------------------------------
 IUINT32 ikcp_check(const ikcpcb *kcp, IUINT32 current)
 {
 	IUINT32 ts_flush = kcp->ts_flush;
