@@ -865,7 +865,7 @@ void ikcp_flush(ikcpcb *kcp)
 	count = kcp->ackcount;
 	for (i = 0; i < count; i++) {
 		size = (int)(ptr - buffer);
-		if (size > (int)kcp->mtu) {
+		if (size + IKCP_OVERHEAD > (int)kcp->mtu) {
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
@@ -901,7 +901,7 @@ void ikcp_flush(ikcpcb *kcp)
 	if (kcp->probe & IKCP_ASK_SEND) {
 		seg.cmd = IKCP_CMD_WASK;
 		size = (int)(ptr - buffer);
-		if (size > (int)kcp->mtu) {
+		if (size + IKCP_OVERHEAD > (int)kcp->mtu) {
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
@@ -912,7 +912,7 @@ void ikcp_flush(ikcpcb *kcp)
 	if (kcp->probe & IKCP_ASK_TELL) {
 		seg.cmd = IKCP_CMD_WINS;
 		size = (int)(ptr - buffer);
-		if (size > (int)kcp->mtu) {
+		if (size + IKCP_OVERHEAD > (int)kcp->mtu) {
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
@@ -992,7 +992,7 @@ void ikcp_flush(ikcpcb *kcp)
 			size = (int)(ptr - buffer);
 			need = IKCP_OVERHEAD + segment->len;
 
-			if (size + need >= (int)kcp->mtu) {
+			if (size + need > (int)kcp->mtu) {
 				ikcp_output(kcp, buffer, size);
 				ptr = buffer;
 			}
@@ -1042,7 +1042,9 @@ void ikcp_flush(ikcpcb *kcp)
 
 
 //---------------------------------------------------------------------
-// input update
+// update state (call it repeatedly, every 10ms-100ms), or you can ask 
+// ikcp_check when to call it again (without ikcp_input/_send calling).
+// 'current' - current timestamp in millisec. 
 //---------------------------------------------------------------------
 void ikcp_update(ikcpcb *kcp, IUINT32 current)
 {
@@ -1074,13 +1076,12 @@ void ikcp_update(ikcpcb *kcp, IUINT32 current)
 
 //---------------------------------------------------------------------
 // Determine when should you invoke ikcp_update:
-// if there is no ikcp_input/_send calling, you can call ikcp_update
-// after millisecs ikcp_check returns, instead of call update repeatly.
-// It is important to reduce unnacessary ikcp_update calling. you can 
-// just call ikcp_update in a very small interval, or you can use it to 
-// schedule ikcp_update calling (eg. when you are implementing an epoll
-// like mechanism, or optimize ikcp_update when handling massive kcp 
-// connections)
+// returns when you should invoke ikcp_update in millisec, if there 
+// is no ikcp_input/_send calling. you can call ikcp_update in that
+// time, instead of call update repeatly.
+// Important to reduce unnacessary ikcp_update invoking. use it to 
+// schedule ikcp_update (eg. implementing an epoll-like mechanism, 
+// or optimize ikcp_update when handling massive kcp connections)
 //---------------------------------------------------------------------
 IUINT32 ikcp_check(const ikcpcb *kcp, IUINT32 current)
 {
